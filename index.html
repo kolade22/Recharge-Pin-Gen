@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Recharge PIN Gen</title>
     <!-- <link rel="stylesheet" href="style.css" /> -->
+    <style>
+      td,
+      th,
+      thead,
+      tbody,
+      tr {
+        border-collapse: collapse;
+        border: 1px solid black;
+        padding: 10px;
+      }
+    </style>
   </head>
   <body>
     <select name="" id="provider">
@@ -33,9 +44,23 @@
     <button onclick="loadPin()">Load</button>
     <p id="message"></p>
     <p id="balance">Balance: #0</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>S/N</th>
+          <th>PIN</th>
+          <th>Amount</th>
+          <th>Provider</th>
+          <th>Used</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
   </body>
 </html>
 <script>
+  let cards = JSON.parse(localStorage.getItem("cardDatabase")) || [];
   let currentPin = "";
   let balance = 0;
   let provider = document.getElementById("provider");
@@ -50,7 +75,7 @@
     }
 
     let pin = "";
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 12; i++) {
       pin += Math.floor(Math.random() * 10);
     }
     currentPin = pin;
@@ -59,6 +84,16 @@
     The ${provider.value} #${amount.value} PIN is: <br>
     <span style="font-size: 1.2em; color: #007bff;">${pin}</span>
   `;
+    let cardObj = {
+      provider: provider.value,
+      amount: amount.value,
+      pin: currentPin,
+      isUsed: false,
+    };
+    cards.push(cardObj);
+    localStorage.setItem("cardDatabase", JSON.stringify(cards));
+    console.log(cards);
+    displayCards();
   }
 
   function loadPin() {
@@ -80,15 +115,38 @@
     } else if (verifyPin !== currentPin) {
       alert("Wrong PIN.");
     } else {
-      balance += parseInt(amount.value);
+      balance += +amount.value;
       document.getElementById("balance").innerHTML = `Balance: #${balance}`;
       alert(
         `You've successfully loaded your ${provider.value} #${amount.value} recharge card. Kindly check your balance.`,
       );
+
+      let usedCard = cards.find((card) => card.pin === currentPin);
+      if (usedCard) {
+        usedCard.isUsed = true;
+        localStorage.setItem("cardDatabase", JSON.stringify(cards));
+      }
+
       loader.value = "*311*#";
       provider.value = "";
       amount.value = "";
       currentPin = "";
+      displayCards();
     }
   }
+
+  function displayCards() {
+    tbody.innerHTML = "";
+    cards.forEach((card, index) => {
+      tbody.innerHTML += `<tr>
+        <td>${index + 1}</td>
+        <td>${card.pin}</td>
+        <td>${card.amount}</td>
+        <td>${card.provider}</td>
+        <td>${card.isUsed ? "Yes" : "No"}</td>
+      </tr>`;
+    });
+  }
+
+  displayCards();
 </script>

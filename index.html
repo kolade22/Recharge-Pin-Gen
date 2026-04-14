@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Recharge PIN Gen</title>
-    <!-- <link rel="stylesheet" href="style.css" /> -->
     <style>
       td,
       th,
@@ -45,6 +44,18 @@
     <p id="message"></p>
     <p id="balance">Balance: #0</p>
 
+    <h3>BalanceProvider</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Balance</th>
+        </tr>
+      </thead>
+      <tbody id="providerTbody"></tbody>
+    </table>
+
+    <h3>Cards</h3>
     <table>
       <thead>
         <tr>
@@ -62,9 +73,28 @@
 <script>
   let cards = JSON.parse(localStorage.getItem("cardDatabase")) || [];
   let currentPin = "";
-  let balance = 0;
+  let balance = +localStorage.getItem("mybalance") || 0;
+  let providerBalances = JSON.parse(
+    localStorage.getItem("providerBalances"),
+  ) || { MTN: 0, Glo: 0, Airtel: 0, "9Mobile": 0 };
   let provider = document.getElementById("provider");
   let amount = document.getElementById("amount");
+
+  function displayBal() {
+    document.getElementById("balance").innerHTML = `Balance: #${balance}`;
+  }
+  displayBal();
+
+  function displayProviderBalances() {
+    providerTbody.innerHTML = "";
+    Object.keys(providerBalances).forEach((provider) => {
+      providerTbody.innerHTML += `<tr>
+        <td>${provider}</td>
+        <td>#${providerBalances[provider]}</td>
+      </tr>`;
+    });
+  }
+  displayProviderBalances();
 
   function genPin() {
     let res = document.getElementById("output");
@@ -99,33 +129,48 @@
   function loadPin() {
     let loader = document.getElementById("load");
     let loaderVal = loader.value.trim();
-    let verifyPin = loaderVal.slice(5, -1);
+    let verifyPin = loaderVal.slice(5, 17);
 
-    if (!currentPin) {
-      alert("Please generate a new PIN first.");
+    if (loaderVal === "*311*#" || verifyPin === "") {
+      alert("Please input a PIN to recharge.");
       return;
     }
 
-    if (loaderVal === "") {
-      alert("Please input a PIN to recharge.");
-    } else if (!loaderVal.includes("*311*")) {
-      alert("You must use the recharge code *311*#");
-    } else if (!loaderVal.endsWith("#")) {
-      alert("You must end pin with #");
-    } else if (verifyPin !== currentPin) {
-      alert("Wrong PIN.");
+    if (
+      !loaderVal.startsWith("*311*") ||
+      !loaderVal.endsWith("#") ||
+      loaderVal.length !== 18 ||
+      isNaN(verifyPin)
+    ) {
+      alert("Invalid Format");
     } else {
-      balance += +amount.value;
-      document.getElementById("balance").innerHTML = `Balance: #${balance}`;
-      alert(
-        `You've successfully loaded your ${provider.value} #${amount.value} recharge card. Kindly check your balance.`,
+      let matchedCard = cards.find((card) => card.pin === verifyPin);
+      if (!matchedCard) {
+        alert("Invalid Card");
+        return;
+      }
+      if (matchedCard.isUsed === true) {
+        alert("This card has already been used.");
+        return;
+      }
+
+      balance += +matchedCard.amount;
+      localStorage.setItem("mybalance", balance);
+
+      providerBalances[matchedCard.provider] += +matchedCard.amount;
+      localStorage.setItem(
+        "providerBalances",
+        JSON.stringify(providerBalances),
       );
 
-      let usedCard = cards.find((card) => card.pin === currentPin);
-      if (usedCard) {
-        usedCard.isUsed = true;
-        localStorage.setItem("cardDatabase", JSON.stringify(cards));
-      }
+      displayBal();
+      displayProviderBalances();
+      alert(
+        `You've successfully loaded your ${matchedCard.provider} #${matchedCard.amount} recharge card. Kindly check your balance.`,
+      );
+
+      matchedCard.isUsed = true;
+      localStorage.setItem("cardDatabase", JSON.stringify(cards));
 
       loader.value = "*311*#";
       provider.value = "";
@@ -137,16 +182,18 @@
 
   function displayCards() {
     tbody.innerHTML = "";
-    cards.forEach((card, index) => {
-      tbody.innerHTML += `<tr>
+    cards
+      .slice()
+      .reverse()
+      .forEach((card, index) => {
+        tbody.innerHTML += `<tr>
         <td>${index + 1}</td>
         <td>${card.pin}</td>
         <td>${card.amount}</td>
         <td>${card.provider}</td>
         <td>${card.isUsed ? "Yes" : "No"}</td>
       </tr>`;
-    });
+      });
   }
-
   displayCards();
 </script>
